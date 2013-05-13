@@ -11,7 +11,7 @@
 #define WEST 3
 
 #define GET_SPACE(board, x, y) board->grid[((x)*board->cols) + (y)]
-#define OUTPUT(board, x, y) output[((x)*board->cols*2) + (y)]
+#define OUTPUT(board, x, y) board->output[((x)*board->cols*2) + (y)]
 
 typedef struct {
   int door;

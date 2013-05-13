@@ -9,10 +9,17 @@ board_t* create_board(board_t* board, int board_rows, int board_cols){
   int input_row = 0;
   int input_col = 0;
   int width = 2*board_cols - 1;
+  int display_size, i;
   line = malloc(width+3);
   board->rows = board_rows;
   board->cols = board_cols;
   board->grid = malloc(board_rows*board_cols*sizeof(space_t*));
+  display_size  = (2*board->cols)*(2*board->rows) + 1;
+  board->output = calloc(display_size, 1);
+  for(i = 0; i < display_size-1; i++){
+    board->output[i] = ' ';
+  }
+
   while (fgets(line, width+3, f) != NULL){
     printf("%s", line);
     for(input_col = 0; input_col < width; input_col++){
@@ -46,13 +53,7 @@ board_t* create_board(board_t* board, int board_rows, int board_cols){
 }
 
 void display_board(board_t* board){
-  int output_row, output_col, i;
-  int display_size = (2*board->cols)*(2*board->rows) + 1;
-  char* output = calloc(display_size, 1);
-  for(i = 0; i < display_size-1; i++){
-    output[i] = ' ';
-  }
-
+  int output_row, output_col;
   
   for(output_row = 0; output_row < board->rows; output_row++){
     for(output_col = 0; output_col < board->cols; output_col++){
@@ -72,7 +73,7 @@ void display_board(board_t* board){
     OUTPUT(board, 2*output_row, 2*(output_col)-1) = '\n';
     OUTPUT(board, 2*output_row + 1, 2*(output_col)-1) = '\n';
   }
-  printf("%s",output);
+  printf("%s",board->output);
 }
 
 space_t* create_space(board_t* board, int row, int col){
