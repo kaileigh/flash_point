@@ -28,6 +28,7 @@ class space:
     self.hotspot = False
     self.hazmat = False
     self.walls = [None, None, None, None]
+    self.adj = [None, None, None, None]
     self.graphics = "", ""
 
 class board:
@@ -89,17 +90,8 @@ def sync_graphics(space):
     space.graphics = "".join(s), space.graphics[1]
 
 def spread_fire(board, space, wall, direction):
-  if direction == facing.NORTH and space.row == 0:
-    print "hit the top"
-    return
-  if direction == facing.EAST and space.col == board.cols - 1:
-    print "hit the right"
-    return
-  if direction == facing.SOUTH and space.row == board.rows - 1:
-    print "hit the bottom"
-    return
-  if direction == facing.WEST and space.col == 0:
-    print "hit the left"
+  if space.adj[direction] is None:
+    print "hit direction ", direction
     return
   if (wall is None or (wall.is_door and wall.is_open)):
     new_row = space.row + facing.move[direction][0]
@@ -121,9 +113,12 @@ def spread_fire(board, space, wall, direction):
       wall = None
   sync_graphics(space)
 
-
-
-
+def link_spaces(this_space, other_space, facing):
+  ## N -> S, E -> W, S -> N, W -> E
+  other_facing = (facing + 2) % 4 
+  this_space.adj[facing] = other_space
+  other_space.adj[other_facing] = this_space
+  this_space.walls[facing] = other_space.walls[other_facing]
 
 def create_board(name, rows, cols):
   f = open(name, 'r')
@@ -141,9 +136,9 @@ def create_board(name, rows, cols):
       this_space = game_board.grid[i][j]
       this_space.walls = parse_walls(this_space)
       if i > 0:
-        this_space.walls[facing.NORTH] = game_board.grid[i-1][j].walls[facing.SOUTH]
+        link_spaces(this_space, game_board.grid[i-1][j], facing.NORTH)
       if j > 0:
-        this_space.walls[facing.WEST] = game_board.grid[i][j-1].walls[facing.EAST]
+        link_spaces(this_space, game_board.grid[i][j-1], facing.WEST)
   print_board(game_board)
   set_fire(game_board, 0, 0)
   set_fire(game_board, 0, 0)
