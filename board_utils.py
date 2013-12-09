@@ -1,6 +1,7 @@
 #!usr/bin/env python
 
 import sys
+from itertools import izip
 
 class facing:
   NORTH, EAST, SOUTH, WEST = range(4)
@@ -65,21 +66,38 @@ def print_board(board):
       sys.stdout.write(space.graphics[0])
     sys.stdout.write('\n')
     for space in row:
+      s = list(space.graphics[1])
       sys.stdout.write(space.graphics[1])
     sys.stdout.write('\n')
+
+def is_clear(wall):
+  return wall is None or (wall.is_door and wall.is_open)
 
 def set_fire(board, row, col):
   space = board.grid[row][col]
   if space.fire_status == fire.NONE:
+    print "smoke in ", space.row, space.col
     space.fire_status = fire.SMOKE
   elif space.fire_status == fire.SMOKE:
     space.fire_status = fire.FIRE
   elif space.fire_status == fire.FIRE:
     for direction, wall in enumerate(space.walls):
       spread_fire(board, space, wall, direction)
+  for row in board.grid:
+    for s in row:
+      if s.fire_status == fire.SMOKE:
+        for adj, wall in zip(s.adj, s.walls):
+          if adj is not None and adj.fire_status == fire.FIRE and is_clear(wall):
+            s.fire_status = fire.FIRE
+            print "flashover in ", s.row, s.col
+            sync_graphics(s)
   sync_graphics(space)
 
 def sync_graphics(space):
+  if space.fire_status == fire.NONE:
+    s = list(space.graphics[0])
+    s[1] = ' '
+    space.graphics = "".join(s), space.graphics[1]
   if space.fire_status == fire.SMOKE:
     s = list(space.graphics[0])
     s[1] = '#'
@@ -88,16 +106,81 @@ def sync_graphics(space):
     s = list(space.graphics[0])
     s[1] = '!'
     space.graphics = "".join(s), space.graphics[1]
+  if space.walls[facing.EAST] is None:
+    a = list(space.graphics[0])
+    a[2] = ' '
+    b = list(space.graphics[1])
+    b[2] = ' '
+    space.graphics = "".join(a), "".join(b)
+  elif space.walls[facing.EAST].damage == 1:
+    a = list(space.graphics[0])
+    a[2] = '/'
+    b = list(space.graphics[1])
+    b[2] = '/'
+    space.graphics = "".join(a), "".join(b)
+    print space.graphics
+  elif space.walls[facing.EAST].damage == 0:
+    if space.walls[facing.EAST].is_door:
+      if space.walls[facing.EAST].is_open:
+        a = list(space.graphics[0])
+        a[2] = '-'
+        b = list(space.graphics[1])
+        b[2] = '|'
+        space.graphics = "".join(a), "".join(b)
+      else:
+        a = list(space.graphics[0])
+        a[2] = '+'
+        b = list(space.graphics[1])
+        b[2] = '|'
+        space.graphics = "".join(a), "".join(b)
+    else:
+        a = list(space.graphics[0])
+        a[2] = '|'
+        b = list(space.graphics[1])
+        b[2] = '|'
+        space.graphics = "".join(a), "".join(b)
+  if space.walls[facing.SOUTH] is None:
+    a = list(space.graphics[1])
+    a[0] = ' '
+    a[1] = ' '
+    a[2] = ' '
+    space.graphics = space.graphics[0], "".join(a)
+  elif space.walls[facing.SOUTH].damage == 1:
+    a = list(space.graphics[1])
+    a[0] = '/'
+    a[1] = '/'
+    a[2] = '/'
+    space.graphics = space.graphics[0], "".join(a)
+  elif space.walls[facing.SOUTH].damage == 0:
+    if space.walls[facing.SOUTH].is_door:
+      if space.walls[facing.SOUTH].is_open:
+        a = list(space.graphics[1])
+        a[0] = '-'
+        a[1] = '|'
+        a[2] = '-'
+        space.graphics = space.graphics[0], "".join(a)
+      else:
+        a = list(space.graphics[1])
+        a[0] = '-'
+        a[1] = '+'
+        a[2] = '-'
+        space.graphics = space.graphics[0], "".join(a)
+    else:
+      a = list(space.graphics[1])
+      a[0] = '-'
+      a[1] = '-'
+      a[2] = '-'
+      space.graphics = space.graphics[0], "".join(a)
 
 def spread_fire(board, space, wall, direction):
   if space.adj[direction] is None:
-    print "hit direction ", direction
+    print "hit edge at direction ", direction
     return
-  if (wall is None or (wall.is_door and wall.is_open)):
+  if is_clear(wall):
     new_row = space.row + facing.move[direction][0]
     new_col = space.col + facing.move[direction][1]
     print "spreading to ", new_row, new_col
-    adj_space = board.grid[new_row][new_col]
+    adj_space = space.adj[direction]
     if adj_space.fire_status == fire.NONE:
       adj_space.fire_status = fire.SMOKE
     elif adj_space.fire_status == fire.SMOKE:
@@ -140,11 +223,9 @@ def create_board(name, rows, cols):
       if j > 0:
         link_spaces(this_space, game_board.grid[i][j-1], facing.WEST)
   print_board(game_board)
-  set_fire(game_board, 0, 0)
-  set_fire(game_board, 0, 0)
-  set_fire(game_board, 0, 0)
-  set_fire(game_board, 0, 0)
-  set_fire(game_board, 0, 0)
+  for x in range(3):
+    set_fire(game_board, 1, 2)
+  print game_board.grid[1][2].graphics
   print_board(game_board)
   return game_board
 
