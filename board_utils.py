@@ -10,6 +10,8 @@ class facing:
 class fire:
   NONE, SMOKE, FIRE = range(3)
 
+# If a board is a graph of spaces, walls are a description of edges between
+# spaces. A wall can be a door or not; if it's a door, it can be open or not.
 class wall:
   def __init__(self, is_door, is_open, damage):
     self.is_door = is_door
@@ -21,6 +23,14 @@ class poi:
     self.revealed = revealed
     self.false_alarm = false_alarm
 
+# A space object is a logical representation of a cell on the game board. It
+# contains the state information for the space, an adjacency list of its
+# neighbors, and a description of the walls between itself and its neighbors.
+
+# It also contains a 2-row, 3-column graphical representation of itself.
+# Graphically, a space is responsible for representing the walls and doors to
+# its EAST and SOUTH, as well as the presence of fire, players, POIs, hazmat,
+# hot spots, etc. How to cram all this in is TBD.
 class space:
   def __init__(self, row, col):
     self.row = row
@@ -31,7 +41,7 @@ class space:
     self.walls = [None, None, None, None]
     self.adj = [None, None, None, None]
     self.graphics = "", ""
-
+# A board contains the game state, including most importantly a grid of spaces.
 class board:
   def __init__(self, rows, cols):
     self.rows = rows
@@ -47,6 +57,8 @@ def split_input_line(string):
     triplet_list.append(string[i:i+3])
   return triplet_list
 
+# Go from a 2x3 graphics cell to a logical representation of walls surrounding
+# a space
 def parse_walls(space):
   graphics = space.graphics
   walls = [None] * 4
@@ -70,9 +82,15 @@ def print_board(board):
       sys.stdout.write(space.graphics[1])
     sys.stdout.write('\n')
 
+# Fire can spread from one space to another if there is no wall between them, or
+# if there is a door and it is open
 def is_clear(wall):
   return wall is None or (wall.is_door and wall.is_open)
 
+# If a space is empty, place smoke in it. If it's got smoke, flip the smoke to
+# fire. If it's got fire, resolve an explosion - spread fire in each direction.
+# Afterwards, resolve flashover over the entire board - if there is smoke
+# adjacent to fire, smoke becomes fire.
 def set_fire(board, row, col):
   space = board.grid[row][col]
   if space.fire_status == fire.NONE:
@@ -93,7 +111,10 @@ def set_fire(board, row, col):
             sync_graphics(s)
   sync_graphics(space)
 
+# Get the 2x3 graphics strings to line up with the internal representation of a
+# space.
 def sync_graphics(space):
+  # set fire status
   if space.fire_status == fire.NONE:
     s = list(space.graphics[0])
     s[1] = ' '
@@ -106,6 +127,7 @@ def sync_graphics(space):
     s = list(space.graphics[0])
     s[1] = '!'
     space.graphics = "".join(s), space.graphics[1]
+  # set east wall
   if space.walls[facing.EAST] is None:
     a = list(space.graphics[0])
     a[2] = ' '
@@ -139,17 +161,20 @@ def sync_graphics(space):
         b = list(space.graphics[1])
         b[2] = '|'
         space.graphics = "".join(a), "".join(b)
+  # set south wall. the east wall has priority for the lower right corner.
   if space.walls[facing.SOUTH] is None:
     a = list(space.graphics[1])
     a[0] = ' '
     a[1] = ' '
-    a[2] = ' '
+    if space.walls[facing.EAST] is None:
+      a[2] = ' '
     space.graphics = space.graphics[0], "".join(a)
   elif space.walls[facing.SOUTH].damage == 1:
     a = list(space.graphics[1])
     a[0] = '/'
     a[1] = '/'
-    a[2] = '/'
+    if space.walls[facing.EAST] is None:
+      a[2] = '/'
     space.graphics = space.graphics[0], "".join(a)
   elif space.walls[facing.SOUTH].damage == 0:
     if space.walls[facing.SOUTH].is_door:
@@ -157,44 +182,53 @@ def sync_graphics(space):
         a = list(space.graphics[1])
         a[0] = '-'
         a[1] = '|'
-        a[2] = '-'
+        if space.walls[facing.EAST] is None:
+          a[2] = '-'
         space.graphics = space.graphics[0], "".join(a)
       else:
         a = list(space.graphics[1])
         a[0] = '-'
         a[1] = '+'
-        a[2] = '-'
+        if space.walls[facing.EAST] is None:
+          a[2] = '-'
         space.graphics = space.graphics[0], "".join(a)
     else:
       a = list(space.graphics[1])
       a[0] = '-'
       a[1] = '-'
-      a[2] = '-'
+      if space.walls[facing.EAST] is None:
+        a[2] = '-'
       space.graphics = space.graphics[0], "".join(a)
 
 def spread_fire(board, space, wall, direction):
   if space.adj[direction] is None:
+    # This is the edge of the board
     print "hit edge at direction ", direction
     return
+  adj_space = space.adj[direction]
   if is_clear(wall):
-    new_row = space.row + facing.move[direction][0]
-    new_col = space.col + facing.move[direction][1]
-    print "spreading to ", new_row, new_col
-    adj_space = space.adj[direction]
+    # Spread fire until we hit an empty space
     if adj_space.fire_status == fire.NONE:
       adj_space.fire_status = fire.SMOKE
     elif adj_space.fire_status == fire.SMOKE:
       adj_space.fire_status = fire.FIRE
     elif adj_space.fire_status == fire.FIRE:
       spread_fire(board, adj_space, adj_space.walls[direction], direction)
-    sync_graphics(adj_space)
+
   elif wall.is_door:
-    wall = None
+    print "blowing up door"
+    # If we hit a door, blow it off its hinges!
+    space.walls[direction] = None
   else:
+    # If we hit a wall, damage it
+    print "damaging wall"
     wall.damage += 1
     if wall.damage == 2:
-      wall = None
+      print "wall destroyed"
+      # If a wall has 2 damage, it collapses
+      space.walls[direction] = None
   sync_graphics(space)
+  sync_graphics(adj_space)
 
 def link_spaces(this_space, other_space, facing):
   ## N -> S, E -> W, S -> N, W -> E
@@ -222,11 +256,15 @@ def create_board(name, rows, cols):
         link_spaces(this_space, game_board.grid[i-1][j], facing.NORTH)
       if j > 0:
         link_spaces(this_space, game_board.grid[i][j-1], facing.WEST)
+# Testing, remove
   print_board(game_board)
-  for x in range(3):
+
+  for x in range(4):
+    print "setting fire ", x
     set_fire(game_board, 1, 2)
   print game_board.grid[1][2].graphics
   print_board(game_board)
+# No longer testing
   return game_board
 
 
