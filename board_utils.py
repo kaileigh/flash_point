@@ -140,7 +140,6 @@ def sync_graphics(space):
     b = list(space.graphics[1])
     b[2] = '/'
     space.graphics = "".join(a), "".join(b)
-    print space.graphics
   elif space.walls[facing.EAST].damage == 0:
     if space.walls[facing.EAST].is_door:
       if space.walls[facing.EAST].is_open:
@@ -216,23 +215,32 @@ def spread_fire(board, space, wall, direction):
       spread_fire(board, adj_space, adj_space.walls[direction], direction)
 
   elif wall.is_door:
-    print "blowing up door"
+    print "blowing up door to direction", direction, "of space", space.row,space.col
     # If we hit a door, blow it off its hinges!
-    space.walls[direction] = None
+    destroy_wall(space, direction)
   else:
     # If we hit a wall, damage it
-    print "damaging wall"
+    print "damaging wall to direction",direction,"of space",space.row,space.col
     wall.damage += 1
     if wall.damage == 2:
       print "wall destroyed"
       # If a wall has 2 damage, it collapses
-      space.walls[direction] = None
+      destroy_wall(space,direction)
   sync_graphics(space)
   sync_graphics(adj_space)
 
-def link_spaces(this_space, other_space, facing):
+def destroy_wall(space, direction):
+  space.walls[direction] = None
+  if space.adj[direction] is not None:
+    other_facing = mirror_facing(direction)
+    space.adj[direction].walls[other_facing] = None
+
+def mirror_facing(facing):
   ## N -> S, E -> W, S -> N, W -> E
-  other_facing = (facing + 2) % 4 
+  return (facing + 2) % 4
+
+def link_spaces(this_space, other_space, facing):
+  other_facing = mirror_facing(facing)
   this_space.adj[facing] = other_space
   other_space.adj[other_facing] = this_space
   this_space.walls[facing] = other_space.walls[other_facing]
@@ -259,11 +267,10 @@ def create_board(name, rows, cols):
 # Testing, remove
   print_board(game_board)
 
-  for x in range(4):
+  for x in range(5):
     print "setting fire ", x
     set_fire(game_board, 1, 2)
-  print game_board.grid[1][2].graphics
-  print_board(game_board)
+    print_board(game_board)
 # No longer testing
   return game_board
 
